@@ -6,5 +6,5 @@ public static class demoConsts
 
     public const string DbSchema = null;
 
-    public const string test = "test3";
+    public const string test = "test5";
 }
