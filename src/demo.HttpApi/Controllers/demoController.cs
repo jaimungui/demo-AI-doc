@@ -9,7 +9,7 @@ public abstract class demoController : AbpControllerBase
 {
     protected demoController()
     {
-        //commensdftssasdsdasdcs
+        //sdsdzxc
         //commentdf
         LocalizationResource = typeof(demoResource);
     }
