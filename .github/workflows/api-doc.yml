@@ -1,0 +1,79 @@
+name: Generate API Documentation
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  generate-docs:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      
+      - name: Find C# API Controllers
+        id: find-controllers
+        run: |
+          echo "Finding API Controllers..."
+          find . -type f -name "*Controller.cs" > controllers.txt
+          cat controllers.txt
+        
+      - name: Generate Documentation with Copilot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "# API Documentation" > API_DOCUMENTATION.md
+          echo "" >> API_DOCUMENTATION.md
+          echo "Auto-generated documentation for API Controllers" >> API_DOCUMENTATION.md
+          echo "" >> API_DOCUMENTATION.md
+          echo "Generated on: $(date)" >> API_DOCUMENTATION.md
+          echo "" >> API_DOCUMENTATION.md
+          
+          # Process each controller file
+          while IFS= read -r controller; do
+            if [ -f "$controller" ]; then
+              echo "Processing $controller..."
+              echo "## $(basename $controller)" >> API_DOCUMENTATION.md
+              echo "" >> API_DOCUMENTATION.md
+              
+              # Use GitHub CLI with Copilot to generate documentation
+              gh copilot suggest "Analyze this C# controller file and generate documentation for all API endpoints, including HTTP methods, routes, parameters, and return types: $(cat $controller)" >> API_DOCUMENTATION.md || true
+              echo "" >> API_DOCUMENTATION.md
+              echo "---" >> API_DOCUMENTATION.md
+              echo "" >> API_DOCUMENTATION.md
+            fi
+          done < controllers.txt
+      
+      - name: Create Pull Request with Documentation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          BRANCH_NAME="docs/api-documentation-$(date +%s)"
+          git checkout -b $BRANCH_NAME
+          
+          git add API_DOCUMENTATION.md
+          git commit -m "docs: Auto-generate API documentation from controllers"
+          git push origin $BRANCH_NAME
+          
+          gh pr create \
+            --title "📚 Auto-generated API Documentation" \
+            --body "This PR contains auto-generated documentation for API Controllers and methods, created after merging PR #${{ github.event.pull_request.number }}." \
+            --base main \
+            --head $BRANCH_NAME
